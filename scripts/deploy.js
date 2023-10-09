@@ -17,7 +17,7 @@ async function main() {
   // const Lib = await ethers.getContractFactory("PenSwapLibrary");
   // const lib = await Lib.deploy();
   // await lib.deployed();
-  const Greeter = await hre.ethers.getContractFactory("MamiStakeV2", {
+  const Greeter = await hre.ethers.getContractFactory("LG", {
     // libraries: {
     //   PenSwapLibrary: lib.address,
     // },
