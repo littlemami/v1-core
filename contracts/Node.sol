@@ -4,18 +4,22 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {Common} from "./Common.sol";
+import {Common721, ERC721A} from "./Common721.sol";
+import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 contract S is ERC20 {
-    constructor(
-        address account,
-        uint256 amount
-    ) ERC20("Littlemami Coin", "LMC") {
+    constructor(address account, uint256 amount) ERC20("USDT", "USDT") {
         _mint(account, amount);
     }
 }
 
-contract Node is Common {
+interface RewardsToken {
+    function mint(address, uint256) external;
+}
+
+contract Node is Common721 {
     using Math for uint256;
 
     using SafeERC20 for IERC20Metadata;
@@ -32,9 +36,32 @@ contract Node is Common {
 
     uint256 public growDivBy;
 
-    event Buy(address indexed buyer, uint256 num);
+    address public preSigner;
 
-    constructor() {
+    bytes32 public claimRoot;
+
+    address public lmc;
+
+    uint256 public phase;
+
+    mapping(uint256 => uint256) public phaseBlockNumber;
+
+    mapping(address => uint256) public preBuyers;
+
+    mapping(address => uint256) public holders;
+
+    mapping(address => uint256) public claimedNFT;
+
+    mapping(address => uint256) public claimedLMC;
+
+    event Buy(
+        address indexed buyer,
+        uint256 num,
+        uint256 totalTokenNeed,
+        address indexed tokenAddress
+    );
+
+    constructor() ERC721A("Littlemami Node", "LMN") {
         S s = new S(msg.sender, 1e30);
         tokenPrice = 300 * 1e18;
         tokenAddress = address(s);
@@ -42,14 +69,54 @@ contract Node is Common {
         maxSell = 30000;
         grow = 1005;
         growDivBy = 1000;
+        preSigner = address(0xB59Ad0d1156833531852a0537Eefc25795d73333);
+        phase = 1;
+        phaseBlockNumber[1] = block.number;
     }
 
-    function buy(uint256 num) external nonReentrant {
+    function preBuy(
+        bytes calldata signature,
+        uint256 maxNum,
+        uint256 num
+    ) external {
+        require(phase == 1, "Node : Not pre open");
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, maxNum));
+        bytes32 hash = MessageHashUtils.toEthSignedMessageHash(leaf);
+
+        require(
+            SignatureChecker.isValidSignatureNow(preSigner, hash, signature),
+            "Node : Invalid signature"
+        );
+
+        require(
+            preBuyers[msg.sender] + num <= maxNum,
+            "Node : Out of pre max num"
+        );
+        _buy(num);
+        preBuyers[msg.sender] += num;
+    }
+
+    function buy(uint256 num) external {
+        require(phase != 1, "Node : Not open");
+        _buy(num);
+    }
+
+    function adminBuy(address[] calldata addrs) external onlyOwner {
+        for (uint256 i = 0; i < addrs.length; i++) {
+            address recev = addrs[i];
+            totalSell++;
+            holders[recev]++;
+            _setPrice();
+            emit Buy(recev, 1, 0, tokenAddress);
+        }
+    }
+
+    function _buy(uint256 num) private nonReentrant {
         require(totalSell + num <= maxSell, "Node : Out of max sell");
         uint256 totalTokenNeed;
         for (uint256 i = 0; i < num; i++) {
             totalTokenNeed += tokenPrice;
-            totalSell += 1;
+            totalSell++;
             _setPrice();
         }
         IERC20Metadata(tokenAddress).safeTransferFrom(
@@ -57,7 +124,25 @@ contract Node is Common {
             address(this),
             totalTokenNeed
         );
-        emit Buy(msg.sender, num);
+
+        holders[msg.sender] += num;
+
+        emit Buy(
+            msg.sender,
+            num,
+            totalTokenNeed / 10 ** IERC20Metadata(tokenAddress).decimals(),
+            tokenAddress
+        );
+    }
+
+    function claimNFT(uint256 num) external {
+        require(maxSell == totalSell, "Node : Not end");
+        require(
+            claimedNFT[msg.sender] + num <= holders[msg.sender],
+            "Node : Out of claim"
+        );
+        claimedNFT[msg.sender] += num;
+        _mint(msg.sender, num);
     }
 
     function _setPrice() private {
@@ -68,10 +153,43 @@ contract Node is Common {
             );
             tokenPrice = tokenPrice * 10 ** tokenDecimals;
         }
+        if (totalSell >= 3000 && phase == 2) {
+            changePhase(3);
+        }
     }
 
-    function set(address token, uint256 price) external onlyOwner {
+    function setToken(address token, uint256 price) external onlyOwner {
         tokenAddress = token;
         tokenPrice = price;
+    }
+
+    function endPrePhase() external onlyOwner {
+        require(phase == 1, "Node : Not pre open");
+        changePhase(2);
+    }
+
+    function changePhase(uint256 change) private {
+        phase = change;
+        phaseBlockNumber[change] = block.number;
+    }
+
+    function setPreRoot(address signer) external onlyOwner {
+        preSigner = signer;
+    }
+
+    function setClaimRoot(bytes32 root) external onlyOwner {
+        claimRoot = root;
+    }
+
+    function claimLMC(uint256 max, bytes32[] calldata proof) external {
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, max));
+        require(
+            MerkleProof.verify(proof, claimRoot, leaf),
+            "Node : Invalid proof"
+        );
+
+        uint256 claimAmt = max - claimedLMC[msg.sender];
+
+        RewardsToken(lmc).mint(msg.sender, claimAmt);
     }
 }

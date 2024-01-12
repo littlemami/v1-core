@@ -17,12 +17,12 @@ async function main() {
   // const Lib = await ethers.getContractFactory("PenSwapLibrary");
   // const lib = await Lib.deploy();
   // await lib.deployed();
-  const Greeter = await hre.ethers.getContractFactory("LG", {
+  const Greeter = await hre.ethers.getContractFactory("Node", {
     // libraries: {
     //   PenSwapLibrary: lib.address,
     // },
   });
-  
+
   const greeter = await Greeter.deploy();
 
   await greeter.deployed();

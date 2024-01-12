@@ -6,36 +6,33 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract Common is Ownable, ReentrancyGuard {
+abstract contract Common is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20Metadata;
 
     constructor() Ownable(msg.sender) {}
 
-    function withdrawErc721(
-        address token,
-        address account,
-        uint256 tokenId
-    ) external onlyOwner nonReentrant {
-        IERC721(token).transferFrom(address(this), account, tokenId);
+    function withdrawETH(address payable to) external onlyOwner nonReentrant {
+        (bool success, ) = to.call{value: address(this).balance}("");
+        require(success, "Transfer failed.");
     }
 
-    function withdrawErc20(
+    function withdrawERC20(
         address token,
-        address account,
-        uint256 amount
+        address to
     ) external onlyOwner nonReentrant {
-        require(
-            IERC20Metadata(token).balanceOf(address(this)) >= amount,
-            "Common : Not enough balance"
+        IERC20Metadata(token).safeTransfer(
+            to,
+            IERC20Metadata(token).balanceOf(address(this))
         );
-        IERC20Metadata(token).safeTransfer(account, amount);
     }
 
-    function withdrawEth(
-        address payable account,
-        uint256 amount
+    function withdrawERC721(
+        address token,
+        address to,
+        uint256[] calldata tokenIds
     ) external onlyOwner nonReentrant {
-        require(address(this).balance >= amount, "Common : Not enough balance");
-        account.transfer(amount);
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            IERC721(token).transferFrom(address(this), to, tokenIds[i]);
+        }
     }
 }
