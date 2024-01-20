@@ -196,7 +196,7 @@ contract Node is Common721 {
 
         claimAmt -= fee;
 
-        RewardsToken(lmc).mint(msg.sender, fee);
+        RewardsToken(lmc).mint(fundation, fee);
 
         RewardsToken(lmc).mint(msg.sender, claimAmt);
     }
