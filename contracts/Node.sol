@@ -44,6 +44,8 @@ contract Node is Common721 {
 
     uint256 public phase;
 
+    address public fundation;
+
     mapping(uint256 => uint256) public phaseBlockNumber;
 
     mapping(address => uint256) public preBuyers;
@@ -62,9 +64,9 @@ contract Node is Common721 {
     );
 
     constructor() ERC721A("Littlemami Node", "LMN") {
-        S s = new S(msg.sender, 1e30);
-        tokenPrice = 300 * 1e18;
-        tokenAddress = address(s);
+        fundation = 0xB03167F37319F2C67Dd3062fc1482044205484d1;
+        tokenAddress = 0xE3260C48D8ff9DB109CeC43f4b2Be1A1F3f74CFc;
+        tokenPrice = 300 * 10 ** IERC20Metadata(tokenAddress).decimals();
 
         maxSell = 30000;
         grow = 1005;
@@ -189,6 +191,12 @@ contract Node is Common721 {
         );
 
         uint256 claimAmt = max - claimedLMC[msg.sender];
+
+        uint256 fee = (claimAmt * 5) / 100;
+
+        claimAmt -= fee;
+
+        RewardsToken(lmc).mint(msg.sender, fee);
 
         RewardsToken(lmc).mint(msg.sender, claimAmt);
     }
