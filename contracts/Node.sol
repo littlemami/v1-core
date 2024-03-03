@@ -44,7 +44,7 @@ contract Node is Common721 {
 
     uint256 public phase;
 
-    address public fundation;
+    address public foundation;
 
     mapping(uint256 => uint256) public phaseBlockNumber;
 
@@ -64,16 +64,16 @@ contract Node is Common721 {
     );
 
     constructor() ERC721A("Littlemami Node", "LMN") {
-        fundation = 0xB03167F37319F2C67Dd3062fc1482044205484d1;
-        tokenAddress = 0xE3260C48D8ff9DB109CeC43f4b2Be1A1F3f74CFc;
+        foundation = 0xB03167F37319F2C67Dd3062fc1482044205484d1;
+        tokenAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
         tokenPrice = 300 * 10 ** IERC20Metadata(tokenAddress).decimals();
 
         maxSell = 30000;
         grow = 1005;
         growDivBy = 1000;
         preSigner = address(0xB59Ad0d1156833531852a0537Eefc25795d73333);
-        phase = 1;
-        phaseBlockNumber[1] = block.number;
+
+        phaseBlockNumber[0] = block.number;
     }
 
     function preBuy(
@@ -165,6 +165,11 @@ contract Node is Common721 {
         tokenPrice = price;
     }
 
+    function startPrePhase() external onlyOwner {
+        require(phase == 0, "Node : Not phase 0");
+        changePhase(1);
+    }
+
     function endPrePhase() external onlyOwner {
         require(phase == 1, "Node : Not pre open");
         changePhase(2);
@@ -196,7 +201,7 @@ contract Node is Common721 {
 
         claimAmt -= fee;
 
-        RewardsToken(lmc).mint(fundation, fee);
+        RewardsToken(lmc).mint(foundation, fee);
 
         RewardsToken(lmc).mint(msg.sender, claimAmt);
     }
