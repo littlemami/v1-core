@@ -14,8 +14,10 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         address nftAddress;
         address tokenAddress;
         uint256 tokenAmount;
+        uint256 start;
         uint256 rate;
         address rewardsTokenAddress;
+        uint256 stakedAmount;
     }
 
     struct User {
@@ -43,6 +45,8 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         uint256 passTokenId
     ) external {
         Pool storage pool = poolInfos[poolId];
+        checkPool(poolId);
+        require(pool.start <= block.number, "Pool not start");
         bool userExist;
         for (uint256 i = 0; i < poolAddrs[poolId].length; i++) {
             if (poolAddrs[poolId][i] == msg.sender) {
@@ -64,11 +68,13 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
             );
             require(
                 tokenUsed[poolId][stakeTokenIds[i]] == address(0),
-                "stake token id used"
+                "Stake token id used"
             );
             tokenUsed[poolId][stakeTokenIds[i]] = msg.sender;
         }
         poolUsers[poolId][msg.sender].amount += stakeTokenIds.length;
+        pool.stakedAmount += stakeTokenIds.length;
+
         IERC20(pool.tokenAddress).transferFrom(
             msg.sender,
             address(this),
@@ -80,7 +86,7 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         if (passTokenId != 0) {
             require(
                 passUsed[poolId][passTokenId] == address(0),
-                "pass token id used"
+                "Pass token id used"
             );
             passUsed[poolId][passTokenId] = msg.sender;
         }
@@ -90,7 +96,7 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         if (passTokenId != 0) {
             require(
                 passUsed[poolId][passTokenId] == msg.sender,
-                "pass token id not used by you"
+                "Pass token id not used by you"
             );
             passUsed[poolId][passTokenId] = address(0);
         }
@@ -107,6 +113,7 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         uint256 passTokenId
     ) external {
         Pool storage pool = poolInfos[poolId];
+        checkPool(poolId);
         unEquipPass(poolId, passTokenId);
 
         for (uint256 i = 0; i < unStakeTokenIds.length; i++) {
@@ -117,11 +124,42 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
             );
             require(
                 tokenUsed[poolId][unStakeTokenIds[i]] == msg.sender,
-                "stake token id not used by you"
+                "Stake token id not used by you"
             );
             tokenUsed[poolId][unStakeTokenIds[i]] = address(0);
         }
         poolUsers[poolId][msg.sender].amount -= unStakeTokenIds.length;
+        pool.stakedAmount -= unStakeTokenIds.length;
         IERC20(pool.tokenAddress).transfer(msg.sender, pool.tokenAmount);
     }
+
+    function claim(uint256 poolId) public {}
+
+    function setPool(
+        uint256 poolId,
+        address nftAddress,
+        address tokenAddress,
+        uint256 tokenAmount,
+        uint256 start,
+        uint256 rate,
+        address rewardsTokenAddress
+    ) public onlyOwner {
+        poolInfos[poolId] = Pool(
+            nftAddress,
+            tokenAddress,
+            tokenAmount,
+            start,
+            rate,
+            rewardsTokenAddress,
+            0
+        );
+    }
+
+    function checkPool(uint256 poolId) public view {
+        Pool memory pool = poolInfos[poolId];
+        require(pool.tokenAddress != address(0), "Pool not exist");
+        require(pool.start <= block.number, "Pool not start");
+    }
+
+    function _sync() private {}
 }
