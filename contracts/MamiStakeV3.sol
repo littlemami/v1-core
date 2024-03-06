@@ -43,10 +43,9 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         uint256 poolId,
         uint256[] calldata stakeTokenIds,
         uint256 passTokenId
-    ) external {
+    ) external checkPool(poolId) {
         Pool storage pool = poolInfos[poolId];
-        checkPool(poolId);
-        require(pool.start <= block.number, "Pool not start");
+
         bool userExist;
         for (uint256 i = 0; i < poolAddrs[poolId].length; i++) {
             if (poolAddrs[poolId][i] == msg.sender) {
@@ -111,9 +110,9 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         uint256 poolId,
         uint256[] calldata unStakeTokenIds,
         uint256 passTokenId
-    ) external {
+    ) external checkPool(poolId) {
         Pool storage pool = poolInfos[poolId];
-        checkPool(poolId);
+
         unEquipPass(poolId, passTokenId);
 
         for (uint256 i = 0; i < unStakeTokenIds.length; i++) {
@@ -133,7 +132,11 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         IERC20(pool.tokenAddress).transfer(msg.sender, pool.tokenAmount);
     }
 
-    function claim(uint256 poolId) public {}
+    function claim(uint256 poolId) public checkPool(poolId) {
+        Pool memory pool = poolInfos[poolId];
+
+        
+    }
 
     function setPool(
         uint256 poolId,
@@ -155,10 +158,11 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         );
     }
 
-    function checkPool(uint256 poolId) public view {
+    modifier checkPool(uint256 poolId) {
         Pool memory pool = poolInfos[poolId];
         require(pool.tokenAddress != address(0), "Pool not exist");
         require(pool.start <= block.number, "Pool not start");
+        _;
     }
 
     function _sync() private {}
