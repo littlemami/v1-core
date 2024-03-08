@@ -16,6 +16,7 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         uint256 tokenAmount;
         uint256 start;
         uint256 rate;
+        uint256 passRate;
         address rewardsTokenAddress;
         uint256 stakedAmount;
     }
@@ -24,6 +25,7 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         uint256 last;
         uint256 amount;
         uint256 remain;
+        uint256 passTokenId;
     }
 
     mapping(uint256 => Pool) public poolInfos;
@@ -37,7 +39,24 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
     //poolId => stake token id => user address
     mapping(uint256 => mapping(uint256 => address)) public tokenUsed;
 
-    constructor() Ownable(msg.sender) {}
+    IERC721 public passAddress;
+
+    constructor() Ownable(msg.sender) {
+        //test
+        address tokenAddress = 0x42A282eCea54dF092d32D1937e9B83C769DDF1c6;
+        address nftAddress = 0x7023ba9cFA134E5c781a9278Fc7486467B221D5E;
+        passAddress = IERC721(0x7023ba9cFA134E5c781a9278Fc7486467B221D5E);
+        setPool(
+            0,
+            nftAddress,
+            tokenAddress,
+            40000 ether,
+            block.number,
+            10 ether,
+            8.8 ether,
+            tokenAddress
+        );
+    }
 
     function stake(
         uint256 poolId,
@@ -83,26 +102,36 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
 
     function equipPass(uint256 poolId, uint256 passTokenId) public {
         if (passTokenId != 0) {
+            _sync(poolId);
+            require(
+                IERC721(passAddress).ownerOf(passTokenId) == msg.sender,
+                "You dont owner this pass"
+            );
             require(
                 passUsed[poolId][passTokenId] == address(0),
                 "Pass token id used"
             );
             passUsed[poolId][passTokenId] = msg.sender;
+            User storage user = poolUsers[poolId][msg.sender];
+            user.passTokenId = passTokenId;
         }
     }
 
     function unEquipPass(uint256 poolId, uint256 passTokenId) public {
         if (passTokenId != 0) {
+            _sync(poolId);
             require(
                 passUsed[poolId][passTokenId] == msg.sender,
                 "Pass token id not used by you"
             );
             passUsed[poolId][passTokenId] = address(0);
+            User storage user = poolUsers[poolId][msg.sender];
+            user.passTokenId = 0;
         }
     }
 
     function genUser(uint256 poolId) private {
-        poolUsers[poolId][msg.sender] = User(block.number, 0, 0);
+        poolUsers[poolId][msg.sender] = User(block.number, 0, 0, 0);
         poolAddrs[poolId].push(msg.sender);
     }
 
@@ -133,9 +162,11 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
     }
 
     function claim(uint256 poolId) public checkPool(poolId) {
+        _sync(poolId);
         Pool memory pool = poolInfos[poolId];
-
-        
+        User storage user = poolUsers[poolId][msg.sender];
+        RewardsToken(pool.rewardsTokenAddress).mint(msg.sender, user.remain);
+        user.remain = 0;
     }
 
     function setPool(
@@ -145,6 +176,7 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         uint256 tokenAmount,
         uint256 start,
         uint256 rate,
+        uint256 passRate,
         address rewardsTokenAddress
     ) public onlyOwner {
         poolInfos[poolId] = Pool(
@@ -153,6 +185,7 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
             tokenAmount,
             start,
             rate,
+            passRate,
             rewardsTokenAddress,
             0
         );
@@ -165,5 +198,15 @@ contract MamiStakeV2 is Ownable, ReentrancyGuard {
         _;
     }
 
-    function _sync() private {}
+    function _sync(uint256 poolId) private {
+        Pool memory pool = poolInfos[poolId];
+        User storage user = poolUsers[poolId][msg.sender];
+        uint256 last = pool.start > user.last ? pool.start : user.last;
+        uint256 rate = user.passTokenId > 0 ? pool.passRate : pool.rate;
+        uint256 remain = ((block.number - last) * user.amount * rate) /
+            pool.stakedAmount;
+
+        user.remain += remain;
+        user.last = block.number;
+    }
 }
