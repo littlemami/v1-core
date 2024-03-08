@@ -9,7 +9,7 @@ interface RewardsToken {
     function mint(address, uint256) external;
 }
 
-contract MamiStakeV2 is Ownable, ReentrancyGuard {
+contract MamiStakeV3 is Ownable, ReentrancyGuard {
     struct Pool {
         address nftAddress;
         address tokenAddress;
