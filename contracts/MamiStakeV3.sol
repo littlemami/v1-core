@@ -16,9 +16,10 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         uint256 tokenAmount;
         uint256 start;
         uint256 rate;
-        uint256 passRate;
         address rewardsTokenAddress;
         uint256 stakedAmount;
+        bool passRequired;
+        uint256[] sharePoolIds;
     }
 
     struct User {
@@ -43,18 +44,37 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
 
     constructor() Ownable(msg.sender) {
         //test
-        address tokenAddress = 0x42A282eCea54dF092d32D1937e9B83C769DDF1c6;
-        address nftAddress = 0x7023ba9cFA134E5c781a9278Fc7486467B221D5E;
-        passAddress = IERC721(0x7023ba9cFA134E5c781a9278Fc7486467B221D5E);
+        address tokenAddress = 0x5195b2709770180903b7aCB3841B081Ec7b6DfFf;
+        address nftAddress = 0xd3427F2F46cCa277FFBe068fc0a1B417750AcC33;
+        passAddress = IERC721(0x12c771b96080f243B3e3E0D9643F38FBEb029E24);
+
+        uint256[] memory sharePoolIds0 = new uint256[](1);
+        sharePoolIds0[0] = 1;
+        uint256[] memory sharePoolIds1 = new uint256[](1);
+        sharePoolIds1[0] = 0;
+
         setPool(
             0,
             nftAddress,
             tokenAddress,
             40000 ether,
             block.number,
-            10 ether,
             8.8 ether,
-            tokenAddress
+            tokenAddress,
+            false,
+            sharePoolIds0
+        );
+
+        setPool(
+            1,
+            nftAddress,
+            tokenAddress,
+            40000 ether,
+            block.number,
+            10 ether,
+            tokenAddress,
+            true,
+            sharePoolIds1
         );
     }
 
@@ -76,8 +96,6 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
             genUser(poolId);
         }
 
-        equipPass(poolId, passTokenId);
-
         for (uint256 i = 0; i < stakeTokenIds.length; i++) {
             require(
                 msg.sender ==
@@ -88,7 +106,17 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
                 tokenUsed[poolId][stakeTokenIds[i]] == address(0),
                 "Stake token id used"
             );
+            for (uint256 y = 0; y < pool.sharePoolIds.length; y++) {
+                require(
+                    tokenUsed[pool.sharePoolIds[y]][stakeTokenIds[i]] ==
+                        address(0),
+                    "The nft already staked"
+                );
+            }
             tokenUsed[poolId][stakeTokenIds[i]] = msg.sender;
+        }
+        if (pool.passRequired && poolUsers[poolId][msg.sender].amount == 0) {
+            _equipPass(poolId, passTokenId);
         }
         poolUsers[poolId][msg.sender].amount += stakeTokenIds.length;
         pool.stakedAmount += stakeTokenIds.length;
@@ -96,38 +124,33 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         IERC20(pool.tokenAddress).transferFrom(
             msg.sender,
             address(this),
-            pool.tokenAmount
+            pool.tokenAmount * stakeTokenIds.length
         );
     }
 
-    function equipPass(uint256 poolId, uint256 passTokenId) public {
-        if (passTokenId != 0) {
-            _sync(poolId);
-            require(
-                IERC721(passAddress).ownerOf(passTokenId) == msg.sender,
-                "You dont owner this pass"
-            );
-            require(
-                passUsed[poolId][passTokenId] == address(0),
-                "Pass token id used"
-            );
-            passUsed[poolId][passTokenId] = msg.sender;
-            User storage user = poolUsers[poolId][msg.sender];
-            user.passTokenId = passTokenId;
-        }
+    function _equipPass(uint256 poolId, uint256 passTokenId) private {
+        _sync(poolId);
+        require(
+            IERC721(passAddress).ownerOf(passTokenId) == msg.sender,
+            "You dont owner this pass"
+        );
+        require(
+            passUsed[poolId][passTokenId] == address(0),
+            "Pass token id used"
+        );
+        passUsed[poolId][passTokenId] = msg.sender;
+        User storage user = poolUsers[poolId][msg.sender];
+        user.passTokenId = passTokenId;
     }
 
-    function unEquipPass(uint256 poolId, uint256 passTokenId) public {
-        if (passTokenId != 0) {
-            _sync(poolId);
-            require(
-                passUsed[poolId][passTokenId] == msg.sender,
-                "Pass token id not used by you"
-            );
-            passUsed[poolId][passTokenId] = address(0);
-            User storage user = poolUsers[poolId][msg.sender];
-            user.passTokenId = 0;
-        }
+    function _unEquipPass(uint256 poolId) private {
+        _sync(poolId);
+        User storage user = poolUsers[poolId][msg.sender];
+        uint256 passTokenId = user.passTokenId;
+
+        passUsed[poolId][passTokenId] = address(0);
+
+        user.passTokenId = 0;
     }
 
     function genUser(uint256 poolId) private {
@@ -137,28 +160,30 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
 
     function unStake(
         uint256 poolId,
-        uint256[] calldata unStakeTokenIds,
-        uint256 passTokenId
+        uint256[] calldata unStakeTokenIds
     ) external checkPool(poolId) {
         Pool storage pool = poolInfos[poolId];
 
-        unEquipPass(poolId, passTokenId);
+        claim(poolId);
 
         for (uint256 i = 0; i < unStakeTokenIds.length; i++) {
-            require(
-                msg.sender ==
-                    IERC721(pool.nftAddress).ownerOf(unStakeTokenIds[i]),
-                "You dont owner this nft"
-            );
             require(
                 tokenUsed[poolId][unStakeTokenIds[i]] == msg.sender,
                 "Stake token id not used by you"
             );
             tokenUsed[poolId][unStakeTokenIds[i]] = address(0);
         }
+
         poolUsers[poolId][msg.sender].amount -= unStakeTokenIds.length;
         pool.stakedAmount -= unStakeTokenIds.length;
-        IERC20(pool.tokenAddress).transfer(msg.sender, pool.tokenAmount);
+        IERC20(pool.tokenAddress).transfer(
+            msg.sender,
+            pool.tokenAmount * unStakeTokenIds.length
+        );
+
+        if (pool.passRequired && poolUsers[poolId][msg.sender].amount == 0) {
+            _unEquipPass(poolId);
+        }
     }
 
     function claim(uint256 poolId) public checkPool(poolId) {
@@ -176,8 +201,9 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         uint256 tokenAmount,
         uint256 start,
         uint256 rate,
-        uint256 passRate,
-        address rewardsTokenAddress
+        address rewardsTokenAddress,
+        bool passRequired,
+        uint256[] memory sharePoolIds
     ) public onlyOwner {
         poolInfos[poolId] = Pool(
             nftAddress,
@@ -185,9 +211,10 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
             tokenAmount,
             start,
             rate,
-            passRate,
             rewardsTokenAddress,
-            0
+            0,
+            passRequired,
+            sharePoolIds
         );
     }
 
@@ -199,14 +226,32 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
     }
 
     function _sync(uint256 poolId) private {
-        Pool memory pool = poolInfos[poolId];
+        uint256 pendingRemain = getPendingRemain(poolId, msg.sender);
         User storage user = poolUsers[poolId][msg.sender];
-        uint256 last = pool.start > user.last ? pool.start : user.last;
-        uint256 rate = user.passTokenId > 0 ? pool.passRate : pool.rate;
-        uint256 remain = ((block.number - last) * user.amount * rate) /
-            pool.stakedAmount;
-
-        user.remain += remain;
+        user.remain += pendingRemain;
         user.last = block.number;
+    }
+
+    function getPendingRemain(
+        uint256 poolId,
+        address account
+    ) public view returns (uint256) {
+        uint256 pendingRemain = 0;
+        Pool memory pool = poolInfos[poolId];
+        if (pool.stakedAmount > 0) {
+            User memory user = poolUsers[poolId][account];
+            uint256 last = pool.start > user.last ? pool.start : user.last;
+
+            pendingRemain =
+                ((block.number - last) * user.amount * pool.rate) /
+                pool.stakedAmount;
+        }
+        return pendingRemain;
+    }
+
+    function getSharedTokenIds(
+        uint256 poolId
+    ) public view returns (uint256[] memory) {
+        return poolInfos[poolId].sharePoolIds;
     }
 }
