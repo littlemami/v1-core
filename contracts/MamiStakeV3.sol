@@ -42,7 +42,11 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
 
     IERC721 public passAddress;
 
+    address public foundation;
+
     constructor() Ownable(msg.sender) {
+        //foundation
+        foundation = 0xB03167F37319F2C67Dd3062fc1482044205484d1;
         //test
         address tokenAddress = 0x5195b2709770180903b7aCB3841B081Ec7b6DfFf;
         address nftAddress = 0xd3427F2F46cCa277FFBe068fc0a1B417750AcC33;
@@ -85,6 +89,7 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
     ) external checkPool(poolId) {
         Pool storage pool = poolInfos[poolId];
 
+        claim(poolId);
         bool userExist;
         for (uint256 i = 0; i < poolAddrs[poolId].length; i++) {
             if (poolAddrs[poolId][i] == msg.sender) {
@@ -190,8 +195,19 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         _sync(poolId);
         Pool memory pool = poolInfos[poolId];
         User storage user = poolUsers[poolId][msg.sender];
-        RewardsToken(pool.rewardsTokenAddress).mint(msg.sender, user.remain);
+        uint256 fee = user.remain / 20;
+        RewardsToken(pool.rewardsTokenAddress).mint(foundation, fee);
+        RewardsToken(pool.rewardsTokenAddress).mint(
+            msg.sender,
+            user.remain - fee
+        );
         user.remain = 0;
+    }
+
+    function claimAll(uint256[] calldata poolIds) public {
+        for (uint256 i = 0; i < poolIds.length; i++) {
+            claim(poolIds[i]);
+        }
     }
 
     function setPool(
