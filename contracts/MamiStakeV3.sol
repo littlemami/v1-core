@@ -26,7 +26,6 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         uint256 last;
         uint256 amount;
         uint256 remain;
-        uint256 passTokenId;
     }
 
     mapping(uint256 => Pool) public poolInfos;
@@ -39,6 +38,8 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
     mapping(uint256 => mapping(uint256 => address)) public passUsed;
     //poolId => stake token id => user address
     mapping(uint256 => mapping(uint256 => address)) public tokenUsed;
+    //poolId => stake token id => pass token id
+    mapping(uint256 => mapping(uint256 => uint256)) public tokenPassRelation;
 
     IERC721 public passAddress;
 
@@ -85,8 +86,12 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
     function stake(
         uint256 poolId,
         uint256[] calldata stakeTokenIds,
-        uint256 passTokenId
+        uint256[] calldata passTokenIds
     ) external checkPool(poolId) {
+        require(
+            passTokenIds.length == stakeTokenIds.length,
+            "Invalid length pass and token ids"
+        );
         Pool storage pool = poolInfos[poolId];
 
         claim(poolId);
@@ -119,10 +124,28 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
                 );
             }
             tokenUsed[poolId][stakeTokenIds[i]] = msg.sender;
+
+            if (pool.passRequired) {
+                require(
+                    msg.sender == IERC721(passAddress).ownerOf(passTokenIds[i]),
+                    "You dont owner this pass"
+                );
+                require(
+                    passUsed[poolId][passTokenIds[i]] == address(0),
+                    "Stake pass id used"
+                );
+                for (uint256 y = 0; y < pool.sharePoolIds.length; y++) {
+                    require(
+                        passUsed[pool.sharePoolIds[y]][passTokenIds[i]] ==
+                            address(0),
+                        "The pass already staked"
+                    );
+                }
+                passUsed[poolId][stakeTokenIds[i]] = msg.sender;
+                tokenPassRelation[poolId][stakeTokenIds[i]] = passTokenIds[i];
+            }
         }
-        if (pool.passRequired && poolUsers[poolId][msg.sender].amount == 0) {
-            _equipPass(poolId, passTokenId);
-        }
+
         poolUsers[poolId][msg.sender].amount += stakeTokenIds.length;
         pool.stakedAmount += stakeTokenIds.length;
 
@@ -133,33 +156,8 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         );
     }
 
-    function _equipPass(uint256 poolId, uint256 passTokenId) private {
-        _sync(poolId);
-        require(
-            IERC721(passAddress).ownerOf(passTokenId) == msg.sender,
-            "You dont owner this pass"
-        );
-        require(
-            passUsed[poolId][passTokenId] == address(0),
-            "Pass token id used"
-        );
-        passUsed[poolId][passTokenId] = msg.sender;
-        User storage user = poolUsers[poolId][msg.sender];
-        user.passTokenId = passTokenId;
-    }
-
-    function _unEquipPass(uint256 poolId) private {
-        _sync(poolId);
-        User storage user = poolUsers[poolId][msg.sender];
-        uint256 passTokenId = user.passTokenId;
-
-        passUsed[poolId][passTokenId] = address(0);
-
-        user.passTokenId = 0;
-    }
-
     function genUser(uint256 poolId) private {
-        poolUsers[poolId][msg.sender] = User(block.number, 0, 0, 0);
+        poolUsers[poolId][msg.sender] = User(block.number, 0, 0);
         poolAddrs[poolId].push(msg.sender);
     }
 
@@ -177,6 +175,12 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
                 "Stake token id not used by you"
             );
             tokenUsed[poolId][unStakeTokenIds[i]] = address(0);
+            if (pool.passRequired) {
+                uint256 passTokenId = tokenPassRelation[poolId][
+                    unStakeTokenIds[i]
+                ];
+                passUsed[poolId][passTokenId] = address(0);
+            }
         }
 
         poolUsers[poolId][msg.sender].amount -= unStakeTokenIds.length;
@@ -185,10 +189,6 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
             msg.sender,
             pool.tokenAmount * unStakeTokenIds.length
         );
-
-        if (pool.passRequired && poolUsers[poolId][msg.sender].amount == 0) {
-            _unEquipPass(poolId);
-        }
     }
 
     function claim(uint256 poolId) public checkPool(poolId) {

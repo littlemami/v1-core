@@ -65,6 +65,8 @@ contract Node is Common721 {
 
     constructor() ERC721A("Littlemami Node", "LMN") {
         foundation = 0xB03167F37319F2C67Dd3062fc1482044205484d1;
+            //test
+        // tokenAddress = 0x5195b2709770180903b7aCB3841B081Ec7b6DfFf;
         tokenAddress = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
         tokenPrice = 300 * 10 ** IERC20Metadata(tokenAddress).decimals();
 
