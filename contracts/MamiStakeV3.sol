@@ -88,10 +88,6 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         uint256[] calldata stakeTokenIds,
         uint256[] calldata passTokenIds
     ) external checkPool(poolId) {
-        require(
-            passTokenIds.length == stakeTokenIds.length,
-            "Invalid length pass and token ids"
-        );
         Pool storage pool = poolInfos[poolId];
 
         claim(poolId);
@@ -126,6 +122,10 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
             tokenUsed[poolId][stakeTokenIds[i]] = msg.sender;
 
             if (pool.passRequired) {
+                require(
+                    passTokenIds.length == stakeTokenIds.length,
+                    "Invalid length pass and token ids"
+                );
                 require(
                     msg.sender == IERC721(passAddress).ownerOf(passTokenIds[i]),
                     "You dont owner this pass"
