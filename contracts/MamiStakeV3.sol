@@ -203,15 +203,16 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         if (totalClaimed[poolId] + user.remain >= pool.max) {
             user.remain = pool.max - totalClaimed[poolId];
         }
-
-        uint256 fee = user.remain / 20;
-        RewardsToken(pool.rewardsTokenAddress).mint(foundation, fee);
-        RewardsToken(pool.rewardsTokenAddress).mint(
-            msg.sender,
-            user.remain - fee
-        );
-        totalClaimed[poolId] += user.remain;
-        user.remain = 0;
+        if (user.remain > 0) {
+            uint256 fee = user.remain / 20;
+            RewardsToken(pool.rewardsTokenAddress).mint(foundation, fee);
+            RewardsToken(pool.rewardsTokenAddress).mint(
+                msg.sender,
+                user.remain - fee
+            );
+            totalClaimed[poolId] += user.remain;
+            user.remain = 0;
+        }
     }
 
     function claimAll(uint256[] calldata poolIds) public {
