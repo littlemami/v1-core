@@ -20,6 +20,7 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         uint256 stakedAmount;
         bool passRequired;
         uint256[] sharePoolIds;
+        uint256 max;
     }
 
     struct User {
@@ -40,6 +41,8 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
     mapping(uint256 => mapping(uint256 => address)) public tokenUsed;
     //poolId => stake token id => pass token id
     mapping(uint256 => mapping(uint256 => uint256)) public tokenPassRelation;
+    //poolId => total claimed
+    mapping(uint256 => uint256) public totalClaimed;
 
     IERC721 public passAddress;
 
@@ -67,7 +70,8 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
             8.8 ether,
             tokenAddress,
             false,
-            sharePoolIds0
+            sharePoolIds0,
+            50000000 ether
         );
 
         setPool(
@@ -79,7 +83,8 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
             10 ether,
             tokenAddress,
             true,
-            sharePoolIds1
+            sharePoolIds1,
+            50000000 ether
         );
     }
 
@@ -195,12 +200,17 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         _sync(poolId);
         Pool memory pool = poolInfos[poolId];
         User storage user = poolUsers[poolId][msg.sender];
+        if (totalClaimed[poolId] + user.remain >= pool.max) {
+            user.remain = pool.max - totalClaimed[poolId];
+        }
+
         uint256 fee = user.remain / 20;
         RewardsToken(pool.rewardsTokenAddress).mint(foundation, fee);
         RewardsToken(pool.rewardsTokenAddress).mint(
             msg.sender,
             user.remain - fee
         );
+        totalClaimed[poolId] += user.remain;
         user.remain = 0;
     }
 
@@ -219,7 +229,8 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         uint256 rate,
         address rewardsTokenAddress,
         bool passRequired,
-        uint256[] memory sharePoolIds
+        uint256[] memory sharePoolIds,
+        uint256 max
     ) public onlyOwner {
         poolInfos[poolId] = Pool(
             nftAddress,
@@ -230,7 +241,8 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
             rewardsTokenAddress,
             0,
             passRequired,
-            sharePoolIds
+            sharePoolIds,
+            max
         );
     }
 
