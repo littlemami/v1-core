@@ -146,7 +146,7 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
                         "The pass already staked"
                     );
                 }
-                passUsed[poolId][stakeTokenIds[i]] = msg.sender;
+                passUsed[poolId][passTokenIds[i]] = msg.sender;
                 tokenPassRelation[poolId][stakeTokenIds[i]] = passTokenIds[i];
             }
         }
