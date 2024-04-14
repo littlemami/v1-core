@@ -52,9 +52,14 @@ contract MamiStakeV3 is Ownable, ReentrancyGuard {
         //foundation
         foundation = 0xB03167F37319F2C67Dd3062fc1482044205484d1;
         //test
-        address tokenAddress = 0x5195b2709770180903b7aCB3841B081Ec7b6DfFf;
-        address nftAddress = 0xd3427F2F46cCa277FFBe068fc0a1B417750AcC33;
-        passAddress = IERC721(0x12c771b96080f243B3e3E0D9643F38FBEb029E24);
+        // address tokenAddress = 0x5195b2709770180903b7aCB3841B081Ec7b6DfFf;
+        // address nftAddress = 0xd3427F2F46cCa277FFBe068fc0a1B417750AcC33;
+        // passAddress = IERC721(0x12c771b96080f243B3e3E0D9643F38FBEb029E24);
+
+        //main
+        address tokenAddress = 0x8983CF891867942d06AD6CEb9B9002de860E202d;
+        address nftAddress = 0xbc77f3A44f19113845B2870ce9E72f612D77DC17;
+        passAddress = IERC721(0xd6591bBb8A4867cEa5ec732f9c30379C4A8bE730);
 
         uint256[] memory sharePoolIds0 = new uint256[](1);
         sharePoolIds0[0] = 1;
