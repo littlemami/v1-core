@@ -43,29 +43,11 @@ module.exports = {
           "1234567890123456789012345678901234567890123456789012345678901234",
       ],
     },
-    xdc: {
-      url: process.env.XDC_URL || "",
-      accounts: [
-        process.env.PRIVATE_KEY ||
-          "1234567890123456789012345678901234567890123456789012345678901234",
-      ],
-    },
   },
   etherscan: {
     apiKey: {
       mainnet: process.env.MAINNET_VERIFY_KEY || "",
       arbitrumOne: process.env.ARB_VERIFY_KEY || "",
-      xdc: process.env.XDC_VERIFY_KEY || "",
     },
-    customChains: [
-      {
-        network: "xdc",
-        chainId: 50,
-        urls: {
-          apiURL: "https://bapi.blocksscan.io/api",
-          browserURL: "https://xdc.blocksscan.io/",
-        },
-      },
-    ],
   },
 };
