@@ -39,6 +39,6 @@ contract MarsStake {
 
     function getPendingPoint(address addr) external view returns (uint256) {
         User memory user = users[addr];
-        return user.stake / 360 ether;
+        return (user.stake * 1000) / 360 ether;
     }
 }
