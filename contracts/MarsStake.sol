@@ -25,31 +25,20 @@ contract MarsStake {
     }
 
     function stake(uint256 amount) external {
-        _sync(msg.sender);
         User storage user = users[msg.sender];
         IERC20(lmc).transferFrom(msg.sender, address(this), amount);
         user.stake += amount;
     }
 
     function unstake(uint256 amount) external {
-        _sync(msg.sender);
         User storage user = users[msg.sender];
         require(user.stake >= amount, "Insufficient balance");
         IERC20(lmc).transfer(msg.sender, amount);
         user.stake -= amount;
     }
 
-    function _sync(address addr) private {
-        User storage user = users[addr];
-        if (user.last == 0) {
-            userAddresses.push(addr);
-        }
-        user.point += user.stake * (block.number - user.last);
-        user.last = block.number;
-    }
-
     function getPendingPoint(address addr) external view returns (uint256) {
         User memory user = users[addr];
-        return user.point + user.stake * (block.number - user.last);
+        return user.stake / 360 ether;
     }
 }

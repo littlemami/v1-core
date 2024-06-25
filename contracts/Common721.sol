@@ -1,4 +1,4 @@
-pragma solidity 0.8.22;
+pragma solidity 0.8.23;
 
 import {ERC721AQueryable, ERC721A, IERC721A} from "erc721a/contracts/extensions/ERC721AQueryable.sol";
 import {Common} from "./Common.sol";
